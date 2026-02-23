@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowUp, ArrowDown, Play, Clock, Trophy, Ban, Lock, CheckCircle2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { Round, RoundStatus, Direction } from '../types';
 import { Button } from './Button';
 
@@ -11,6 +12,21 @@ interface RoundCardProps {
 
 export const RoundCard: React.FC<RoundCardProps> = ({ round, currentPrice, onBet }) => {
   const [betAmount, setBetAmount] = useState<string>('0.1');
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatTime = (targetTime: number) => {
+    const diff = Math.max(0, Math.floor((targetTime - now) / 1000));
+    const m = Math.floor(diff / 60).toString().padStart(2, '0');
+    const s = (diff % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
   
   // Calculations
   const totalPrize = round.totalPool;
@@ -28,7 +44,7 @@ export const RoundCard: React.FC<RoundCardProps> = ({ round, currentPrice, onBet
   let headerColor = "bg-trash-surfaceHighlight";
   let statusColor = "text-trash-textDim";
   let statusIcon = <Clock size={14} />;
-  let statusText = "LATER";
+  let statusText = isNext ? `LATER • ${formatTime(round.startTime)}` : "LATER";
   let borderColor = "border-trash-border";
   let glowClass = "";
 
@@ -36,13 +52,13 @@ export const RoundCard: React.FC<RoundCardProps> = ({ round, currentPrice, onBet
     headerColor = "bg-trash-surfaceHighlight"; // Keep header subtle, make border pop
     statusColor = "text-trash-yellow";
     statusIcon = <Play size={14} fill="currentColor" />;
-    statusText = "LIVE NOW";
+    statusText = `LIVE NOW • ${formatTime(round.closeTime)}`;
     borderColor = "border-trash-yellow";
     glowClass = "shadow-glow hover:shadow-glow-strong";
   } else if (isOpen) {
     statusColor = "text-white";
     statusIcon = <Play size={14} />;
-    statusText = "OPEN";
+    statusText = `OPEN • ${formatTime(round.lockTime)}`;
     borderColor = "border-trash-border hover:border-trash-yellow/50";
   } else if (isExpired) {
     statusColor = "text-trash-textDim";
@@ -59,22 +75,44 @@ export const RoundCard: React.FC<RoundCardProps> = ({ round, currentPrice, onBet
 
   // Progress Bar Calculation
   const progressPercent = isLive 
-    ? Math.max(0, Math.min(100, ((Date.now() - round.lockTime) / (round.closeTime - round.lockTime)) * 100))
+    ? Math.max(0, Math.min(100, ((now - round.lockTime) / (round.closeTime - round.lockTime)) * 100))
     : isOpen 
-        ? Math.max(0, Math.min(100, ((Date.now() - round.startTime) / (round.lockTime - round.startTime)) * 100))
+        ? Math.max(0, Math.min(100, ((now - round.startTime) / (round.lockTime - round.startTime)) * 100))
         : 0;
 
   return (
-    <div className={`
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ 
+        opacity: isExpired ? 0.6 : 1,
+        y: 0,
+        scale: isLive ? [1, 1.02, 1] : 1,
+        filter: isExpired ? 'grayscale(100%)' : 'grayscale(0%)'
+      }}
+      transition={{ 
+        duration: 0.4,
+        scale: { duration: 0.5, ease: "easeInOut" }
+      }}
+      className={`
       group flex-shrink-0 w-[340px] bg-trash-surface border ${borderColor} rounded-2xl flex flex-col overflow-hidden relative transition-all duration-300 transform
       ${glowClass}
-      ${!isExpired ? 'hover:-translate-y-2 hover:border-trash-yellow' : 'opacity-60 grayscale hover:grayscale-0 hover:opacity-100'}
+      ${!isExpired ? 'hover:-translate-y-2 hover:border-trash-yellow' : 'hover:grayscale-0 hover:opacity-100'}
     `}>
       
       {/* Header Bar */}
       <div className={`px-4 py-3 flex justify-between items-center ${headerColor} border-b border-trash-border/50`}>
         <div className={`flex items-center gap-2 text-xs font-bold tracking-wider ${statusColor}`}>
-          {statusIcon}
+          {isLive ? (
+            <motion.div
+              animate={{ opacity: [1, 0.4, 1] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+            >
+              {statusIcon}
+            </motion.div>
+          ) : (
+            statusIcon
+          )}
           {statusText}
         </div>
         <div className="text-xs font-mono font-bold text-trash-textDim">#{round.id}</div>
@@ -83,9 +121,11 @@ export const RoundCard: React.FC<RoundCardProps> = ({ round, currentPrice, onBet
       {/* Live Progress Indicator */}
       {(isLive || isOpen) && (
         <div className="w-full bg-trash-border h-1 relative overflow-hidden">
-          <div 
+          <motion.div 
             className={`h-full absolute top-0 left-0 ${isLive ? 'bg-trash-yellow' : 'bg-trash-textDim'}`}
-            style={{ width: `${progressPercent}%` }}
+            initial={{ width: 0 }}
+            animate={{ width: `${progressPercent}%` }}
+            transition={{ ease: "linear", duration: 1 }}
           />
         </div>
       )}
@@ -209,6 +249,6 @@ export const RoundCard: React.FC<RoundCardProps> = ({ round, currentPrice, onBet
         </div>
 
       </div>
-    </div>
+    </motion.div>
   );
 };

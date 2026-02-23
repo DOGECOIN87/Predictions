@@ -77,7 +77,24 @@ function App() {
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const [rounds, setRounds] = useState<Round[]>(INITIAL_ROUNDS);
   const [scrollIndex, setScrollIndex] = useState(1); // Start showing the Live card
+  const [activeLiveRoundId, setActiveLiveRoundId] = useState<number | null>(null);
   const cardsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to LIVE round when it changes
+  useEffect(() => {
+    const liveRound = rounds.find(r => r.status === RoundStatus.LIVE);
+    if (liveRound && liveRound.id !== activeLiveRoundId) {
+      setActiveLiveRoundId(liveRound.id);
+      setTimeout(() => {
+        const cardEl = document.getElementById(`card-${liveRound.id}`);
+        if (cardEl && cardsContainerRef.current) {
+          const container = cardsContainerRef.current;
+          const scrollLeft = cardEl.offsetLeft - container.clientWidth / 2 + cardEl.clientWidth / 2;
+          container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+        }
+      }, 100);
+    }
+  }, [rounds, activeLiveRoundId]);
 
   // Initialize Price History
   useEffect(() => {
@@ -208,7 +225,7 @@ function App() {
                 <div className="w-[calc(50vw-160px)] flex-shrink-0" />
                 
                 {rounds.map((round) => (
-                  <div key={round.id} className="snap-center transform transition-transform duration-300">
+                  <div key={round.id} id={`card-${round.id}`} className="snap-center transform transition-transform duration-300">
                     <RoundCard 
                         round={round} 
                         currentPrice={currentPrice} 
